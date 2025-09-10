@@ -21,7 +21,7 @@ function WelcomeScreen({ navigation }) {
                     <View style={styles.logoContainer}>
                         <Image 
                             style={styles.logo} 
-                            source={require('../assets/favicon.png')} 
+                            source={require('../../assets/favicon.png')} 
                         />
                     </View>
                     <Text style={styles.title}>PayUp</Text>

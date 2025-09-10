@@ -1,6 +1,11 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import FriendsScreen from '../Screens/ApplicationScreens/FriendsScreen';
+import GroupScreen from '../Screens/ApplicationScreens/GroupScreen';
+import CalculateScreen from '../Screens/ApplicationScreens/CalculateScreen';
+import ScanScreen from '../Screens/ApplicationScreens/ScanScreen';
+import ProfileScreen from '../Screens/ApplicationScreens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
