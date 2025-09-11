@@ -12,6 +12,7 @@ const Tab = createBottomTabNavigator();
 function NavigationBar(props) {
     return (
         <Tab.Navigator screenOptions={({ route }) => ({
+            headerShown: false,
             tabBarIcon: ({ focused, color, size }) => {
                 let iconName;
                 switch (route.name) {

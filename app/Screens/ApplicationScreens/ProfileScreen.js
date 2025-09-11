@@ -1,8 +1,11 @@
 import React from 'react';
+import { Text, View } from 'react-native';
 
 function ProfileScreen(props) {
     return (
-        <Text>Profile Screen</Text>
+        <View>
+            <Text>Profile Screen</Text>
+        </View>
     );
 }
 

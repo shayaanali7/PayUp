@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
     const signIn = async (credentials) => {
         setLoading(true);
         try {
-            if (credentials.email === 'test' && credentials.password === '1') {
+            if (credentials.email === '' && credentials.password === '') {
                 const userData = {
                     id: Date.now(),
                     email: credentials.email,

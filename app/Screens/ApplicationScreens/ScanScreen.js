@@ -1,8 +1,11 @@
 import React from 'react';
+import { Text, View } from 'react-native';
 
 function ScanScreen(props) {
     return (
-        <Text>Scan Screen</Text>
+        <View>
+            <Text>Scan Screen</Text>
+        </View>
     );
 }
 
