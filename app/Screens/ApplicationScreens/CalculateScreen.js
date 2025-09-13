@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { SafeAreaView, Text, TextInput, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Button } from 'react-native';
+import { Text, TextInput, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Button } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import PersonTab from '../../Components/PersonTab';
 import ItemElement from '../../Components/ItemElement';
 
@@ -32,7 +33,6 @@ function CalculateScreen(props) {
             delete updated[itemId];
             return updated;
         });
-        console.log(itemList);
     };
 
     const handleItemChange = (itemId, itemData) => {
@@ -87,6 +87,7 @@ function CalculateScreen(props) {
                         <Button
                             title="Add Item"
                             onPress={handleAddItem}
+                            color={'#ffffff'}
                         />
                     </View>
 
@@ -118,7 +119,7 @@ function CalculateScreen(props) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#ffffffff',
     },
     keyboardView: {
         flex: 1,
@@ -143,7 +144,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     inputSection: {
-        marginBottom: 30,
+        marginBottom: 5,
     },
     inputContainer: {
         marginBottom: 20,
@@ -173,6 +174,10 @@ const styles = StyleSheet.create({
         elevation: 1,
     },
     buttonContainer: {
+        backgroundColor: '#1654b0ff',
+        borderColor: '#1654b0ff',
+        borderRadius: 20,
+        borderWidth: 2,
         marginBottom: 20,
     },
     itemsSection: {

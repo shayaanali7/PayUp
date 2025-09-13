@@ -117,15 +117,11 @@ const styles = StyleSheet.create({
         flex: 2,
     },
     itemTitle: {
-        fontSize: 16,
+        fontSize: 24,
         fontWeight: '600',
         color: '#1F2937',
         paddingVertical: 8,
         paddingHorizontal: 12,
-        backgroundColor: '#F9FAFB',
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: '#D1D5DB',
     },
     priceContainer: {
         flexDirection: 'row',

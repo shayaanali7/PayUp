@@ -31,7 +31,7 @@ function PersonTab({ people, tax }) {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.sectionTitle}>Tax Breakdown</Text>
+            <Text style={styles.sectionTitle}>Breakdown</Text>
             <FlatList
                 data={peopleArray}
                 renderItem={renderPersonItem}
