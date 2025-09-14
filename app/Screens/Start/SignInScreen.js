@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text } from 'react-native';
+import { Alert, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../Hooks/authContext';
 import { TextInput } from 'react-native';
@@ -44,6 +44,16 @@ function SignInScreen(props) {
             >
                 <Text style={{ color: 'white' }}>
                     {loading ? 'Signing In...' : 'Sign In'}
+                </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                onPress={() => props.navigation.goBack()} 
+                disabled={loading}
+                style={{ backgroundColor: 'blue', padding: 15, marginTop: 10, alignItems: 'center' }}
+            >
+                <Text style={{ color: 'white' }}>
+                    Go back
                 </Text>
             </TouchableOpacity>
         </SafeAreaView>

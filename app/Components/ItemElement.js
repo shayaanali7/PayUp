@@ -129,11 +129,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#F9FAFB',
         borderRadius: 8,
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 12,
         borderWidth: 1,
         borderColor: '#D1D5DB',
         flex: 1,
-        minWidth: 20,
+        minWidth: 60,
     },
     dollarSign: {
         fontSize: 16,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
         marginRight: 4,
     },
     itemPrice: {
-        fontSize: 16,
+        fontSize: 18,
         color: '#059669',
         fontWeight: '600',
         flex: 1,

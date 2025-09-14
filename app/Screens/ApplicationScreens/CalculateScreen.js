@@ -2,14 +2,10 @@ import React, { useState } from 'react';
 import { Text, TextInput, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Button } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PersonTab from '../../Components/PersonTab';
-import ItemElement from '../../Components/ItemElement';
 
 function CalculateScreen(props) {
     const [tax, setTax] = useState('0');
     const [people, setPeople] = useState('');
-    const [itemList, setItemList] = useState([]);
-    const [nextItemId, setNextItemId] = useState(1);
-    const [items, setItems] = useState({});
 
     const handleTaxChange = (text) => {
         const numericText = text.replace(/[^0-9.]/g, '');
@@ -19,27 +15,6 @@ function CalculateScreen(props) {
     const handlePeopleChange = (text) => {
         const numericText = text.replace(/[^0-9]/g, '');
         setPeople(numericText);
-    };
-
-    const handleAddItem = () => {
-        setItemList(prev => [...prev, nextItemId]);
-        setNextItemId(prev => prev + 1);
-    };
-
-    const handleRemoveItem = (itemId) => {
-        setItemList(prev => prev.filter(id => id !== itemId));
-        setItems(prev => {
-            const updated = { ...prev };
-            delete updated[itemId];
-            return updated;
-        });
-    };
-
-    const handleItemChange = (itemId, itemData) => {
-        setItems(prev => ({
-            ...prev,
-            [itemId]: itemData
-        }));
     };
 
     const taxAmount = parseFloat(tax) || 0;
@@ -83,31 +58,9 @@ function CalculateScreen(props) {
                         </View>
                     </View>
 
-                    <View style={styles.buttonContainer}>
-                        <Button
-                            title="Add Item"
-                            onPress={handleAddItem}
-                            color={'#ffffff'}
-                        />
-                    </View>
-
-                    {itemList.length > 0 && (
-                        <View style={styles.itemsSection}>
-                            <Text style={styles.sectionTitle}>Items</Text>
-                            {itemList.map((itemId) => (
-                                <ItemElement 
-                                    key={itemId} 
-                                    id={itemId} 
-                                    onItemChange={handleItemChange}
-                                    onRemoveItem={handleRemoveItem}
-                                />
-                            ))}
-                        </View>
-                    )}
-
                     {peopleCount > 0 && (
                         <View style={styles.resultsSection}>
-                            <PersonTab people={peopleCount} tax={taxAmount} items={items} />
+                            <PersonTab people={peopleCount} tax={taxAmount} />
                         </View>
                     )}
                 </ScrollView>
@@ -172,13 +125,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 2,
         elevation: 1,
-    },
-    buttonContainer: {
-        backgroundColor: '#1654b0ff',
-        borderColor: '#1654b0ff',
-        borderRadius: 20,
-        borderWidth: 2,
-        marginBottom: 20,
     },
     itemsSection: {
         marginBottom: 30,
