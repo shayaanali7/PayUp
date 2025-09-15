@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-function ItemElement({ id, onItemChange, onRemoveItem }) {
-    const [itemName, setItemName] = useState(`Item ${id}`);
-    const [itemPrice, setItemPrice] = useState('');
+function ItemElement({ id, initialData, onItemChange, onRemoveItem }) {
+    const [itemName, setItemName] = useState(initialData.name || `Item ${id}`);
+    const [itemPrice, setItemPrice] = useState(initialData.price && initialData.price > 0 ? initialData.price.toString() : '');
     
     useEffect(() => {
-        if (onItemChange) {
-            onItemChange(id, { name: itemName, price: 0 });
+        if (onItemChange && initialData) {
+            onItemChange(id, { name: initialData.name || `Item ${id}`, price: initialData.price || 0 });
         }
     }, []);
 
@@ -56,6 +56,7 @@ function ItemElement({ id, onItemChange, onRemoveItem }) {
                         value={itemPrice}
                         keyboardType="decimal-pad"
                         textAlign="right"
+                        selectTextOnFocus={true}
                     />
                 </View>
                 

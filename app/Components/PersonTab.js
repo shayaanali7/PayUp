@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, FlatList, Button, TouchableOpacity } from 'react-native';
 import ItemElement from './ItemElement';
 
-function PersonTab({ people, tax }) {
-    const [personData, setPersonData] = useState({});
+function PersonTab({ people, tax, personData, setPersonData }) {
 
     const handleAddItem = (personId) => {
         setPersonData(prev => {
@@ -91,6 +90,7 @@ function PersonTab({ people, tax }) {
                             <ItemElement 
                                 key={itemId} 
                                 id={itemId} 
+                                initialData={currentPersonData.items[itemId] || { name: `Item ${itemId}`, price: 0 }}
                                 onItemChange={(itemId, itemData) => handleItemChange(personId, itemId, itemData)}
                                 onRemoveItem={(itemId) => handleRemoveItem(personId, itemId)}
                             />

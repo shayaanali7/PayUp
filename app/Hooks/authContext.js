@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Alert, AppState } from 'react-native';
 
@@ -21,34 +21,47 @@ export const useAuth = () => {
 }   
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
+    const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                setSession(session);
+            }
+            setLoading(false);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (session) {
+                    setSession(session);
+                }
+                setLoading(false);
+            }
+        );
+
+        return () => subscription.unsubscribe();
+    }, []);
+    const user = session?.user || null;
+    const userMetadata = user?.user_metadata || {};
+
 
     const signIn = async (credentials) => {
         setLoading(true);
         try {
-            if (credentials.email && credentials.password) {
-                const { data, error } = await supabase.auth.signInWithPassword({
-                    email: credentials.email,
-                    password: credentials.password,
-                })
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: credentials.email,
+                password: credentials.password,
+            })
 
-                if (error) {
-                    Alert.alert('Error', error.message);
-                }
-
-                if (data.user) {
-                    const userData = {
-                        id: Date.now(),
-                        email: credentials.email,
-                        name: 'Test User',
-                    };
-                    setUser(userData);
-                    setLoading(false);
-                }
-            } else {
-                throw new Error('Invalid credentials');
+            if (error) {
+                Alert.alert('Error', error.message);
+                setLoading(false);
+                return { error };
             }
+
+            return { data };
         } catch (error) {
             console.error('SignIn Error:', error);
             setLoading(false);
@@ -59,22 +72,23 @@ export const AuthProvider = ({ children }) => {
     const signUp = async (userData) => {
         setLoading(true);
         try {
-            if (userData.email && userData.password) {
-                const { data: { session }, error } = await supabase.auth.signUp({
-                    email: userData.email,
-                    password: userData.password,
-                })
+            const { data, error } = await supabase.auth.signUp({
+                email: userData.email,
+                password: userData.password,
+            });
 
-                if (error) {
-                    setLoading(false);
-                    Alert.alert('Error', error.message);
-                }
-                console.log(session);
-                if (!session) {
-                    Alert.alert('Please check your email to confirm your account.')
-                }
+            if (error) {
+                Alert.alert('Error', error.message);
                 setLoading(false);
+                return { error };
             }
+
+            if (!data.session) {
+                Alert.alert('Please check your email to confirm your account.');
+            }
+
+            setLoading(false);
+            return { data };
         } catch (error) {
             console.error('SignUp Error:', error);
             setLoading(false);
@@ -89,6 +103,8 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{
             user,
+            userMetadata,
+            session,
             loading,    
             signIn,
             signUp,

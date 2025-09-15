@@ -1,11 +1,42 @@
-import React, { useState } from 'react';
-import { Text, TextInput, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Button } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Text, TextInput, View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Button, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PersonTab from '../../Components/PersonTab';
+import { getCalculatorData, handleClearData, saveCalculatorData } from '../../Hooks/calculatorData';
+import { useAuth } from '../../Hooks/authContext';
 
 function CalculateScreen(props) {
+    const { user } = useAuth();
     const [tax, setTax] = useState('0');
     const [people, setPeople] = useState('');
+    const [personData, setPersonData] = useState({});
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    useEffect(() => {
+        const loadData = async () => {
+            if (user.id) {
+                const data = await getCalculatorData(user.id);
+                if (data) {
+                    setTax(data.tax.toString() || '0');
+                    setPeople(data.people.toString() || '0');
+                    setPersonData(data.personData || {});
+                } else {
+                    setTax('0');
+                    setPeople('');
+                    setPersonData({});
+                }
+            }
+            console.log(personData[0]?.items);
+            setIsLoaded(true); 
+        }
+        loadData();
+    }, [user.id]);
+
+    useEffect(() => {
+        if (user?.id && isLoaded) {
+            saveCalculatorData(user.id, { tax, people, personData });
+        }
+    }, [tax, people, personData, user?.id, isLoaded]);  
 
     const handleTaxChange = (text) => {
         const numericText = text.replace(/[^0-9.]/g, '');
@@ -19,6 +50,15 @@ function CalculateScreen(props) {
 
     const taxAmount = parseFloat(tax) || 0;
     const peopleCount = parseInt(people) || 0;
+
+    const handleClear = async () => {
+        setTax('0');
+        setPeople('');
+        setPersonData({});
+        if (user?.id) {
+            await saveCalculatorData(user.id);
+        }
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -56,11 +96,17 @@ function CalculateScreen(props) {
                                 onChangeText={handleTaxChange}
                             />
                         </View>
+
+                        <View>
+                            <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
+                                <Text style={styles.clearButtonText}>Clear</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {peopleCount > 0 && (
                         <View style={styles.resultsSection}>
-                            <PersonTab people={peopleCount} tax={taxAmount} />
+                            <PersonTab people={peopleCount} tax={taxAmount} personData={personData} setPersonData={setPersonData} />
                         </View>
                     )}
                 </ScrollView>
@@ -125,6 +171,20 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.05,
         shadowRadius: 2,
         elevation: 1,
+    },
+    clearButton: {
+        backgroundColor: '#1654b0',
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 20,
+    },
+    clearButtonText: {
+        color: '#ffffffff',
+        fontSize: 16,
+        fontWeight: '600',
     },
     itemsSection: {
         marginBottom: 30,
