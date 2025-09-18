@@ -5,6 +5,8 @@ import PersonTab from '../../Components/PersonTab';
 import { getCalculatorData, handleClearData, saveCalculatorData } from '../../Hooks/calculatorData';
 import { useAuth } from '../../Hooks/authContext';
 
+// 03045e, 0077b6, 00b4d8, 90e0ef, caf0f8
+
 function CalculateScreen(props) {
     const { user } = useAuth();
     const [tax, setTax] = useState('0');
