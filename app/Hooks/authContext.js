@@ -111,7 +111,7 @@ export const AuthProvider = ({ children }) => {
 
             if (error) {
                 Alert.alert('Error', error.message);
-                setLoading(false);
+                setLoading(false);  
                 return { error };
             }
 
