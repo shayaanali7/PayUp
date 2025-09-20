@@ -31,6 +31,7 @@ const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or ema
         .from('users')
         .select('id, name, email, username')
         .or(`name.ilike.%${query}%,email.ilike.%${query}%,username.ilike.%${query}%`)
+        .neq('id', user.id)
         .limit(10);
 
       if (error) {
@@ -39,7 +40,30 @@ const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or ema
         return;
       }
 
-      setSearchResults(data || []);
+      const { data: friendStatusData, error: friendStatusError } = await supabase
+        .from('friendship')
+        .select('status, requester_id, recipient_id')
+        .or(`and(requester_id.eq.${user.id},recipient_id.in.(${data.map(u => u.id).join(',')})),and(recipient_id.eq.${user.id},requester_id.in.(${data.map(u => u.id).join(',')}))`);
+
+      if (friendStatusError) {
+        console.error('Friend status error:', friendStatusError);
+        Alert.alert('Error', 'Failed to retrieve friend status');
+        return;
+      }
+
+      const mergedResults = data.map(searchUser => {
+        const statusObj = friendStatusData.find(f => 
+          (f.requester_id === user.id && f.recipient_id === searchUser.id) ||
+          (f.recipient_id === user.id && f.requester_id === searchUser.id)
+        );
+        
+        return {
+          ...searchUser,
+          status: statusObj ? statusObj.status : null
+        };
+      });
+      
+      setSearchResults(mergedResults);
       setShowResults(true);
     } catch (error) {
       console.error('Search error:', error);
@@ -49,11 +73,26 @@ const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or ema
     }
   };
 
-  const handleUserSelect = (selectedUser) => {
-    setSearchQuery('');
-    setShowResults(false);
-    setSearchResults([]);
-    onUserSelect?.(selectedUser);
+  const updateUserStatus = (userId, newStatus) => {
+    setSearchResults(prevResults => 
+      prevResults.map(user => 
+        user.id === userId 
+          ? { ...user, status: newStatus }
+          : user
+      )
+    );
+  };
+
+  const handleUserSelect = async (selectedUser) => {
+    updateUserStatus(selectedUser.id, 'pending');
+    
+    if (onUserSelect) {
+      try {
+        await onUserSelect(selectedUser);
+      } catch (error) {
+        updateUserStatus(selectedUser.id, null);
+      }
+    }
   };
 
   const clearSearch = () => {
@@ -77,10 +116,21 @@ const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or ema
           )}
         </View>
       </View>
-      <TouchableOpacity onPress={() => handleUserSelect(item)}>
-        <View style={styles.addButtonContainer}>
-          <Text style={styles.addButtonText}>Add</Text>
-        </View>
+      <TouchableOpacity 
+        onPress={() => handleUserSelect(item)} 
+        disabled={item.status === 'pending' || item.status === 'accepted'}
+        style={[
+          styles.addButtonContainer,
+          (item.status === 'pending' || item.status === 'accepted') && styles.disabledButton
+        ]}
+      >
+        <Text style={[
+          styles.addButtonText,
+          (item.status === 'pending' || item.status === 'accepted') && styles.disabledButtonText
+        ]}>
+          {item.status === 'pending' ? 'Pending' : 
+           item.status === 'accepted' ? 'Added' : 'Add'}
+        </Text>
       </TouchableOpacity>
     </View>
   );

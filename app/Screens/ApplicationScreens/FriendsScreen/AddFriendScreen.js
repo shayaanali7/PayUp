@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../../Hooks/authContext';
 import { supabase } from '../../../lib/supabase';
@@ -15,29 +15,55 @@ function AddFriendScreen(props) {
 
     const handleAddFriend = async (friendUser) => {
         if (!friendUser || !friendUser.id) {
-            alert("Invalid user selected.");
-            return;
+            throw new Error("Invalid user selected.");
         }
+        
+        if (friendUser.id === user.id) {
+            throw new Error("You cannot add yourself as a friend.");
+        }
+        
         setIsLoading(true);
-
         try {
-            const friendId = data[0].id;
+            const friendId = friendUser.id;
+            const { data: existingFriendships, error: checkError } = await supabase
+                .from('friendship')
+                .select('*')
+                .or(`and(requester_id.eq.${user.id},recipient_id.eq.${friendId}),and(requester_id.eq.${friendId},recipient_id.eq.${user.id})`);
+
+            if (checkError) {
+                console.error('Error checking existing friendship:', checkError);
+                throw new Error('Failed to check existing friendship. Please try again.');
+            }
+
+            if (existingFriendships && existingFriendships.length > 0) {
+                const existingFriendship = existingFriendships[0];
+                let message = '';
+                if (existingFriendship.status === 'pending') {
+                    message = existingFriendship.requester_id === user.id 
+                        ? 'Friend request already sent!' 
+                        : 'You have a pending friend request from this user!';
+                } else if (existingFriendship.status === 'accepted') {
+                    message = 'You are already friends with this user!';
+                }
+                throw new Error(message);
+            }
+
             const { error: addingFriendError } = await supabase
                 .from('friendship')
                 .insert({
                     requester_id: user.id,
                     recipient_id: friendId,
                     status: 'pending'
-            });
+                });
+                
             if (addingFriendError) {
                 console.error('Error adding friend:', addingFriendError);
-                alert('Failed to send friend request. Please try again.');
-                setIsLoading(false);
-                return;
+                throw new Error('Failed to send friend request. Please try again.');
             }
+            
             Alert.alert(
                 "Friend Request Sent", 
-                `Friend request sent to ${selectedUser.name}!`,
+                `Friend request sent to ${friendUser.name}!`,
                 [
                     {
                         text: "OK",
@@ -45,12 +71,15 @@ function AddFriendScreen(props) {
                     }
                 ]
             );
-        }
-        catch (error) {
+            
+        } catch (error) {
             console.error('Error adding friend:', error);
-            alert('Failed to send friend request. Please try again.');
+            Alert.alert('Error', error.message || 'Failed to send friend request. Please try again.');
+            throw error;
+        } finally {
+            setIsLoading(false);
         }
-    }
+    };
 
     const handleCancel = () => {
         navigation.goBack();
