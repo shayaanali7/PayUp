@@ -25,67 +25,60 @@ function FriendProfileScreen() {
     });
     const [balance, setBalance] = useState(0);
     const [friendshipId, setFriendshipId] = useState(null);
+    const [friendshipData, setFriendshipData] = useState(null);
 
     useEffect(() => {
-        loadExpenses();
+        loadData();
     }, [userId]);
 
-    const loadExpenses = async () => {
+    const loadData = async () => {
         setIsLoading(true);
         try {
-            const { data: friendshipData, error: friendshipError } = await supabase
-                .from('friendship')
-                .select('id, requester_id, recipient_id, total_owed')
-                .or(`and(requester_id.eq.${user.id},recipient_id.eq.${userId}),and(requester_id.eq.${userId},recipient_id.eq.${user.id})`)
-                .eq('status', 'accepted')
-                .single();
+            const [friendshipResult, expensesResult] = await Promise.all([
+                supabase
+                    .from('friendship')
+                    .select('id, requester_id, recipient_id, total_owed')
+                    .or(`and(requester_id.eq.${user.id},recipient_id.eq.${userId}),and(requester_id.eq.${userId},recipient_id.eq.${user.id})`)
+                    .eq('status', 'accepted')
+                    .single(),
+                supabase
+                    .from('expenses')
+                    .select('*')
+                    .or(`and(payer_id.eq.${user.id},receiver_id.eq.${userId}),and(payer_id.eq.${userId},receiver_id.eq.${user.id})`)
+                    .order('created_at', { ascending: false })
+            ]);
 
-            if (friendshipError) {
-                console.error('Error loading friendship:', friendshipError);
+            if (friendshipResult.error) {
+                console.error('Error loading friendship:', friendshipResult.error);
             } else {
-                setFriendshipId(friendshipData.id);
-                let calculatedBalance = friendshipData.total_owed || 0;
-                if (friendshipData.recipient_id === user.id) {
+                const friendship = friendshipResult.data;
+                setFriendshipId(friendship.id);
+                setFriendshipData(friendship);
+                
+                let calculatedBalance = friendship.total_owed || 0;
+                if (friendship.recipient_id === user.id) {
                     calculatedBalance = -calculatedBalance;
                 }
                 setBalance(calculatedBalance);
             }
 
-            const { data, error } = await supabase
-                .from('expenses')
-                .select('*')
-                .or(`and(payer_id.eq.${user.id},receiver_id.eq.${userId}),and(payer_id.eq.${userId},receiver_id.eq.${user.id})`)
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Error loading expenses:', error);
+            if (expensesResult.error) {
+                console.error('Error loading expenses:', expensesResult.error);
                 Alert.alert('Error', 'Failed to load expenses');
-                return;
+            } else {
+                setExpenses(expensesResult.data || []);
             }
 
-            setExpenses(data || []);
         } catch (error) {
-            console.error('Error loading expenses:', error);
+            console.error('Error loading data:', error);
         } finally {
             setIsLoading(false);
         }
     };
 
     const updateFriendshipBalance = async (newBalanceChange) => {
-        if (!friendshipId) return;
-
+        if (!friendshipData) return;
         try {
-            const { data: friendshipData, error: fetchError } = await supabase
-                .from('friendship')
-                .select('requester_id, recipient_id, total_owed')
-                .eq('id', friendshipId)
-                .single();
-
-            if (fetchError) {
-                console.error('Error fetching friendship data:', fetchError);
-                return;
-            }
-
             let currentTotalOwed = friendshipData.total_owed || 0;
             let newTotalOwed;
 
@@ -99,9 +92,15 @@ function FriendProfileScreen() {
                 .from('friendship')
                 .update({ total_owed: newTotalOwed })
                 .eq('id', friendshipId);
-
             if (updateError) {
                 console.error('Error updating friendship balance:', updateError);
+            } else {
+                setFriendshipData(prev => ({ ...prev, total_owed: newTotalOwed }));
+                let updatedBalance = newTotalOwed;
+                if (friendshipData.recipient_id === user.id) {
+                    updatedBalance = -updatedBalance;
+                }
+                setBalance(updatedBalance);
             }
         } catch (error) {
             console.error('Error updating friendship balance:', error);
@@ -121,25 +120,30 @@ function FriendProfileScreen() {
         }
 
         try {
-            const { error } = await supabase
+            const newExpenseData = {
+                description: newExpense.description,
+                amount: amount,
+                payer_id: newExpense.paidBy,
+                receiver_id: newExpense.paidBy === user.id ? userId : user.id,
+                created_at: new Date().toISOString(),
+                payed: false
+            };
+
+            const { data, error } = await supabase
                 .from('expenses')
-                .insert({
-                    description: newExpense.description,
-                    amount: amount,
-                    payer_id: newExpense.paidBy,
-                    receiver_id: newExpense.paidBy === user.id ? userId : user.id,
-                    created_at: new Date().toISOString()
-                });
+                .insert(newExpenseData)
+                .select()
+                .single();
 
             if (error) {
                 console.error('Error adding expense:', error);
                 Alert.alert('Error', 'Failed to add expense');
                 return;
             }
-
             const balanceChange = newExpense.paidBy === user.id ? amount : -amount;
             await updateFriendshipBalance(balanceChange);
 
+            setExpenses(prev => [data, ...prev]);
             setNewExpense({
                 description: '',
                 amount: '',
@@ -147,7 +151,6 @@ function FriendProfileScreen() {
                 splitWith: userId
             });
             setShowAddExpense(false);
-            loadExpenses();
             Alert.alert('Success', 'Expense added successfully');
 
         } catch (error) {
@@ -158,16 +161,12 @@ function FriendProfileScreen() {
 
     const handleSettleExpense = async (expenseId) => {
         try {
-            const { data: expenseData, error: fetchError } = await supabase
-                .from('expenses')
-                .select('*')
-                .eq('id', expenseId)
-                .single();
-
-            if (fetchError) {
-                Alert.alert('Error', 'Failed to fetch expense details');
+            const expense = expenses.find(exp => exp.id === expenseId);
+            if (!expense) {
+                Alert.alert('Error', 'Expense not found');
                 return;
             }
+
             const { error } = await supabase
                 .from('expenses')
                 .update({ payed: true })
@@ -178,11 +177,14 @@ function FriendProfileScreen() {
                 return;
             }
 
-            const amount = parseFloat(expenseData.amount);
-            const balanceChange = expenseData.payer_id === user.id ? -amount : amount;
+            const amount = parseFloat(expense.amount);
+            const balanceChange = expense.payer_id === user.id ? -amount : amount;
             await updateFriendshipBalance(balanceChange);
-
-            loadExpenses();
+            setExpenses(prev => 
+                prev.map(exp => 
+                    exp.id === expenseId ? { ...exp, payed: true } : exp
+                )
+            );
             Alert.alert('Settled!', 'Expense has been marked as settled.');
         } catch (error) {
             Alert.alert('Error', 'Failed to settle expense');
@@ -240,9 +242,7 @@ function FriendProfileScreen() {
                         >
                             <Ionicons name="checkmark" size={20} color="#fff" />
                         </TouchableOpacity>
-                    ) : (
-                        <></>
-                    )}
+                    ) : null}
                 </View>
             </View>
         );
@@ -267,115 +267,117 @@ function FriendProfileScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#1654b0" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{userName}</Text>
-                <TouchableOpacity onPress={() => setShowAddExpense(true)} style={styles.addButton}>
-                    <Ionicons name="add" size={24} color="#1654b0" />
-                </TouchableOpacity>
-            </View>
+            <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={24} color="#1654b0" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>{userName}</Text>
+                    <TouchableOpacity onPress={() => setShowAddExpense(true)} style={styles.addButton}>
+                        <Ionicons name="add" size={24} color="#1654b0" />
+                    </TouchableOpacity>
+                </View>
 
-            <ScrollView style={styles.content}>
-                <View style={styles.balanceCard}>
-                    <View style={styles.balanceHeader}>
-                        <Text style={styles.balanceLabel}>Balance</Text>
+                <ScrollView style={styles.content}>
+                    <View style={styles.balanceCard}>
+                        <View style={styles.balanceHeader}>
+                            <Text style={styles.balanceLabel}>Balance</Text>
+                        </View>
+                        
+                        <View style={styles.balanceAmount}>
+                            {Math.abs(balance) < 0.01 ? (
+                                <Text style={styles.balanceZero}>You're all payed up!</Text>
+                            ) : balance > 0 ? (
+                                <View>
+                                    <Text style={styles.balancePositive}>${balance.toFixed(2)}</Text>
+                                    <Text style={styles.balanceSubtext}>{userName} owes you</Text>
+                                </View>
+                            ) : (
+                                <View>
+                                    <Text style={styles.balanceNegative}>${Math.abs(balance).toFixed(2)}</Text>
+                                    <Text style={styles.balanceSubtext}>You owe {userName}</Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
-                    
-                    <View style={styles.balanceAmount}>
-                        {Math.abs(balance) < 0.01 ? (
-                            <Text style={styles.balanceZero}>You're all payed up!</Text>
-                        ) : balance > 0 ? (
-                            <View>
-                                <Text style={styles.balancePositive}>${balance.toFixed(2)}</Text>
-                                <Text style={styles.balanceSubtext}>{userName} owes you</Text>
-                            </View>
+
+                    <View style={styles.expensesSection}>
+                        <Text style={styles.sectionTitle}>Recent Activity</Text>
+                        {expenses.length > 0 ? (
+                            expenses.map(renderExpense)
                         ) : (
-                            <View>
-                                <Text style={styles.balanceNegative}>${Math.abs(balance).toFixed(2)}</Text>
-                                <Text style={styles.balanceSubtext}>You owe {userName}</Text>
+                            <View style={styles.emptyState}>
+                                <Ionicons name="receipt-outline" size={48} color="#9CA3AF" />
+                                <Text style={styles.emptyStateText}>No expenses yet</Text>
+                                <Text style={styles.emptyStateSubtext}>Add an expense to get started</Text>
                             </View>
                         )}
                     </View>
-                </View>
+                </ScrollView>
 
-                <View style={styles.expensesSection}>
-                    <Text style={styles.sectionTitle}>Recent Activity</Text>
-                    {expenses.length > 0 ? (
-                        expenses.map(renderExpense)
-                    ) : (
-                        <View style={styles.emptyState}>
-                            <Ionicons name="receipt-outline" size={48} color="#9CA3AF" />
-                            <Text style={styles.emptyStateText}>No expenses yet</Text>
-                            <Text style={styles.emptyStateSubtext}>Add an expense to get started</Text>
-                        </View>
-                    )}
-                </View>
-            </ScrollView>
-
-            <Modal
-                visible={showAddExpense}
-                animationType="slide"
-                presentationStyle="pageSheet"
-            >
-                <SafeAreaView style={styles.modalContainer}>
-                    <View style={styles.modalHeader}>
-                        <TouchableOpacity onPress={() => setShowAddExpense(false)}>
-                            <Text style={styles.cancelButton}>Cancel</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.modalTitle}>Add Expense</Text>
-                        <TouchableOpacity onPress={handleAddExpense}>
-                            <Text style={styles.saveButton}>Save</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-                        <View style={styles.modalContent}>
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Description</Text>
-                            <TextInput
-                                style={styles.textInput}
-                                placeholder="What was this expense for?"
-                                value={newExpense.description}
-                                onChangeText={(text) => setNewExpense({...newExpense, description: text})}
-                            />
+                <Modal
+                    visible={showAddExpense}
+                    animationType="slide"
+                    presentationStyle="pageSheet"
+                >
+                    <SafeAreaView style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <TouchableOpacity onPress={() => setShowAddExpense(false)}>
+                                <Text style={styles.cancelButton}>Cancel</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.modalTitle}>Add Expense</Text>
+                            <TouchableOpacity onPress={handleAddExpense}>
+                                <Text style={styles.saveButton}>Save</Text>
+                            </TouchableOpacity>
                         </View>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Amount</Text>
+                        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+                            <View style={styles.modalContent}>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Description</Text>
                                 <TextInput
                                     style={styles.textInput}
-                                    placeholder="0.00"
-                                    value={newExpense.amount}
-                                    onChangeText={(text) => setNewExpense({...newExpense, amount: text})}
-                                    keyboardType="decimal-pad"
+                                    placeholder="What was this expense for?"
+                                    value={newExpense.description}
+                                    onChangeText={(text) => setNewExpense({...newExpense, description: text})}
                                 />
                             </View>
 
                             <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Paid by</Text>
-                                <View style={styles.radioGroup}>
-                                    <TouchableOpacity
-                                        style={styles.radioOption}
-                                        onPress={() => setNewExpense({...newExpense, paidBy: user.id})}
-                                    >
-                                        <View style={[styles.radio, newExpense.paidBy === user.id && styles.radioSelected]} />
-                                        <Text style={styles.radioText}>You</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.radioOption}
-                                        onPress={() => setNewExpense({...newExpense, paidBy: userId})}
-                                    >
-                                        <View style={[styles.radio, newExpense.paidBy === userId && styles.radioSelected]} />
-                                        <Text style={styles.radioText}>{userName}</Text>
-                                    </TouchableOpacity>
+                                <Text style={styles.inputLabel}>Amount</Text>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="0.00"
+                                        value={newExpense.amount}
+                                        onChangeText={(text) => setNewExpense({...newExpense, amount: text})}
+                                        keyboardType="decimal-pad"
+                                    />
+                                </View>
+
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Paid by</Text>
+                                    <View style={styles.radioGroup}>
+                                        <TouchableOpacity
+                                            style={styles.radioOption}
+                                            onPress={() => setNewExpense({...newExpense, paidBy: user.id})}
+                                        >
+                                            <View style={[styles.radio, newExpense.paidBy === user.id && styles.radioSelected]} />
+                                            <Text style={styles.radioText}>You</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={styles.radioOption}
+                                            onPress={() => setNewExpense({...newExpense, paidBy: userId})}
+                                        >
+                                            <View style={[styles.radio, newExpense.paidBy === userId && styles.radioSelected]} />
+                                            <Text style={styles.radioText}>{userName}</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
-                        </View>
-                    </TouchableWithoutFeedback>
-                </SafeAreaView>
-            </Modal>
+                        </TouchableWithoutFeedback>
+                    </SafeAreaView>
+                </Modal>
+            </View>
         </SafeAreaView>
     );
 }
@@ -383,7 +385,7 @@ function FriendProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#ffffff',
     },
     header: {
         flexDirection: 'row',

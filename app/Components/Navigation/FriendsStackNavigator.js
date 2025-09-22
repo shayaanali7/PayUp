@@ -22,7 +22,7 @@ function FriendsStackNavigator() {
                 component={FriendProfileScreen} 
                 options={({ route }) => ({ 
                     title: route.params?.userName || 'Profile',
-                    headerShown: false // Since we have custom header
+                    headerShown: false
                 })}
             />
         </Stack.Navigator>

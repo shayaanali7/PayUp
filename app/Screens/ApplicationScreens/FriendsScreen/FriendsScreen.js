@@ -22,89 +22,79 @@ function FriendsScreen(props) {
                 const { data: friendships, error: friendshipError } = await supabase
                     .from('friendship')
                     .select('id, requester_id, recipient_id, status, total_owed')
-                    .or(`requester_id.eq.${user.id},recipient_id.eq.${user.id}`)
-                    .eq('status', 'accepted');
+                    .or(`requester_id.eq.${user.id},recipient_id.eq.${user.id}`);
 
                 if (friendshipError) {
                     console.error('Error fetching friendships:', friendshipError);
+                    setFriends([]);
+                    setFriendRequests([]);
                 } else {
-                    const friendIds = friendships?.map(friendship => 
-                        friendship.requester_id === user.id 
-                            ? friendship.recipient_id 
-                            : friendship.requester_id
-                    ) || [];
+                    const userIds = new Set();
+                    const acceptedFriendships = [];
+                    const pendingRequests = [];
 
-                    if (friendIds.length > 0) {
-                        const { data: friendsData, error: usersError } = await supabase
+                    friendships?.forEach(friendship => {
+                        if (friendship.status === 'accepted') {
+                            const friendId = friendship.requester_id === user.id 
+                                ? friendship.recipient_id 
+                                : friendship.requester_id;
+                            userIds.add(friendId);
+                            acceptedFriendships.push(friendship);
+                        } else if (friendship.status === 'pending' && friendship.recipient_id === user.id) {
+                            userIds.add(friendship.requester_id);
+                            pendingRequests.push(friendship);
+                        }
+                    });
+
+                    let usersData = [];
+                    if (userIds.size > 0) {
+                        const { data: users, error: usersError } = await supabase
                             .from('users')
                             .select('id, name, username')
-                            .in('id', friendIds);
+                            .in('id', Array.from(userIds));
 
                         if (usersError) {
                             console.error('Error fetching user details:', usersError);
                         } else {
-                            const formattedFriends = friendsData?.map(friend => {
-                                const friendship = friendships.find(f => 
-                                    f.requester_id === friend.id || f.recipient_id === friend.id
-                                );
-                                let balance = friendship?.total_owed || 0;
-                                if (friendship?.recipient_id === user.id) {
-                                    balance = -balance;
-                                }
-                                return {
-                                    id: friend.id,
-                                    name: friend.name,
-                                    username: friend.username,
-                                    friendshipId: friendship?.id,
-                                    balance: balance,
-                                    avatar: '👤'
-                                };
-                            }) || [];
-                            setFriends(formattedFriends);
+                            usersData = users || [];
                         }
-                    } else {
-                        setFriends([]);
                     }
-                }
 
-                const { data: pendingRequests, error: requestsError } = await supabase
-                    .from('friendship')
-                    .select('id, requester_id, status')
-                    .eq('recipient_id', user.id)
-                    .eq('status', 'pending');
-
-                if (requestsError) {
-                    console.error('Error fetching friend requests:', requestsError);
-                } else {
-                    if (pendingRequests && pendingRequests.length > 0) {
-                        const requesterIds = pendingRequests.map(req => req.requester_id);
-                        const { data: requestersData, error: requestersError } = await supabase
-                            .from('users')
-                            .select('id, name, username')
-                            .in('id', requesterIds);
-
-                        if (requestersError) {
-                            console.error('Error fetching requesters data:', requestersError);
-                            setFriendRequests([]);
-                        } else {
-                            const formattedRequests = pendingRequests.map(request => {
-                                const requester = requestersData.find(u => u.id === request.requester_id);
-                                return {
-                                    id: request.id,
-                                    friendshipId: request.id,
-                                    userId: request.requester_id,
-                                    name: requester?.name || 'Unknown User',
-                                    username: requester?.username,
-                                    avatar: '👤'
-                                };
-                            });
-                            setFriendRequests(formattedRequests);
+                    const formattedFriends = acceptedFriendships.map(friendship => {
+                        const friendId = friendship.requester_id === user.id 
+                            ? friendship.recipient_id 
+                            : friendship.requester_id;
+                        const friend = usersData.find(u => u.id === friendId);
+                        
+                        let balance = friendship.total_owed || 0;
+                        if (friendship.recipient_id === user.id) {
+                            balance = -balance;
                         }
-                    } else {
-                        setFriendRequests([]);
-                    }
-                }
 
+                        return {
+                            id: friendId,
+                            name: friend?.name || 'Unknown User',
+                            username: friend?.username,
+                            friendshipId: friendship.id,
+                            balance: balance,
+                            avatar: '👤'
+                        };
+                    });
+
+                    const formattedRequests = pendingRequests.map(request => {
+                        const requester = usersData.find(u => u.id === request.requester_id);
+                        return {
+                            id: request.id,
+                            friendshipId: request.id,
+                            userId: request.requester_id,
+                            name: requester?.name || 'Unknown User',
+                            username: requester?.username,
+                            avatar: '👤'
+                        };
+                    });
+                    setFriends(formattedFriends);
+                    setFriendRequests(formattedRequests);
+                }
             } catch (error) {
                 console.error('Error loading friends:', error);
             }
