@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../Hooks/authContext';
 
-const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or email..." }) => {
+const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or username...", isGroupMode = false, addedUsers }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,31 +40,39 @@ const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or ema
         return;
       }
 
-      const { data: friendStatusData, error: friendStatusError } = await supabase
-        .from('friendship')
-        .select('status, requester_id, recipient_id')
-        .or(`and(requester_id.eq.${user.id},recipient_id.in.(${data.map(u => u.id).join(',')})),and(recipient_id.eq.${user.id},requester_id.in.(${data.map(u => u.id).join(',')}))`);
-
-      if (friendStatusError) {
-        console.error('Friend status error:', friendStatusError);
-        Alert.alert('Error', 'Failed to retrieve friend status');
-        return;
-      }
-
-      const mergedResults = data.map(searchUser => {
-        const statusObj = friendStatusData.find(f => 
-          (f.requester_id === user.id && f.recipient_id === searchUser.id) ||
-          (f.recipient_id === user.id && f.requester_id === searchUser.id)
-        );
-        
-        return {
+      let mergedResults = [];
+      if (isGroupMode) {
+        mergedResults = data.map(searchUser => ({
           ...searchUser,
-          status: statusObj ? statusObj.status : null
-        };
-      });
-      
+          isAdded: addedUsers.some(addedUser => addedUser.id === searchUser.id)
+        }));
+      } else {
+        const { data: friendStatusData, error: friendStatusError } = await supabase
+          .from('friendship')
+          .select('status, requester_id, recipient_id')
+          .or(`and(requester_id.eq.${user.id},recipient_id.in.(${data.map(u => u.id).join(',')})),and(recipient_id.eq.${user.id},requester_id.in.(${data.map(u => u.id).join(',')}))`);
+
+        if (friendStatusError) {
+          console.error('Friend status error:', friendStatusError);
+          Alert.alert('Error', 'Failed to retrieve friend status');
+          return;
+        }
+
+        mergedResults = data.map(searchUser => {
+          const statusObj = friendStatusData.find(f => 
+            (f.requester_id === user.id && f.recipient_id === searchUser.id) ||
+            (f.recipient_id === user.id && f.requester_id === searchUser.id)
+          );
+          
+          return {
+            ...searchUser,
+            status: statusObj ? statusObj.status : null
+          };
+        });
+      }
       setSearchResults(mergedResults);
       setShowResults(true);
+
     } catch (error) {
       console.error('Search error:', error);
       Alert.alert('Error', 'Failed to search users');
@@ -74,23 +82,42 @@ const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or ema
   };
 
   const updateUserStatus = (userId, newStatus) => {
-    setSearchResults(prevResults => 
-      prevResults.map(user => 
-        user.id === userId 
-          ? { ...user, status: newStatus }
-          : user
-      )
-    );
+    if (isGroupMode) {
+      setSearchResults(prevResults => 
+        prevResults.map(user => 
+          user.id === userId 
+            ? { ...user, isAdded: true }
+            : user
+        )
+      );
+    } else {
+      setSearchResults(prevResults => 
+        prevResults.map(user => 
+          user.id === userId 
+            ? { ...user, status: newStatus }
+            : user
+        )
+      );
+    }
   };
 
   const handleUserSelect = async (selectedUser) => {
-    updateUserStatus(selectedUser.id, 'pending');
+    if (isGroupMode) {
+      updateUserStatus(selectedUser.id, 'added');
+      clearSearch();
+    } else {
+      updateUserStatus(selectedUser.id, 'pending');
+    }
     
     if (onUserSelect) {
       try {
         await onUserSelect(selectedUser);
       } catch (error) {
-        updateUserStatus(selectedUser.id, null);
+        if (isGroupMode) {
+          updateUserStatus(selectedUser.id, false);
+        } else {
+          updateUserStatus(selectedUser.id, null);
+        }
       }
     }
   };
@@ -116,22 +143,40 @@ const SearchBarComponent = ({ onUserSelect, placeholder = "Search by name or ema
           )}
         </View>
       </View>
-      <TouchableOpacity 
-        onPress={() => handleUserSelect(item)} 
-        disabled={item.status === 'pending' || item.status === 'accepted'}
-        style={[
-          styles.addButtonContainer,
-          (item.status === 'pending' || item.status === 'accepted') && styles.disabledButton
-        ]}
-      >
-        <Text style={[
-          styles.addButtonText,
-          (item.status === 'pending' || item.status === 'accepted') && styles.disabledButtonText
-        ]}>
-          {item.status === 'pending' ? 'Pending' : 
-           item.status === 'accepted' ? 'Added' : 'Add'}
-        </Text>
-      </TouchableOpacity>
+      {isGroupMode ? (
+        <TouchableOpacity 
+          onPress={() => handleUserSelect(item)} 
+          disabled={item.isAdded}
+          style={[
+            styles.addButtonContainer,
+            item.isAdded && styles.disabledButton
+          ]}
+        >
+          <Text style={[
+            styles.addButtonText,
+            item.isAdded && styles.disabledButtonText
+          ]}>
+            {item.isAdded ? 'Added' : 'Add'}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity 
+          onPress={() => handleUserSelect(item)} 
+          disabled={item.status === 'pending' || item.status === 'accepted'}
+          style={[
+            styles.addButtonContainer,
+            (item.status === 'pending' || item.status === 'accepted') && styles.disabledButton
+          ]}
+        >
+          <Text style={[
+            styles.addButtonText,
+            (item.status === 'pending' || item.status === 'accepted') && styles.disabledButtonText
+          ]}>
+            {item.status === 'pending' ? 'Pending' : 
+            item.status === 'accepted' ? 'Added' : 'Add'}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 

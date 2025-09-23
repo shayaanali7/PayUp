@@ -1,11 +1,11 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import GroupScreen from '../../Screens/ApplicationScreens/GroupScreen';
 import CalculateScreen from '../../Screens/ApplicationScreens/CalculateScreen';
 import ScanScreen from '../../Screens/ApplicationScreens/ScanScreen';
 import ProfileScreen from '../../Screens/ApplicationScreens/ProfileScreen';
 import FriendsStackNavigator from './FriendsStackNavigator';
+import GroupStackNavigator from './GroupStackNavigator';
 
 const Tab = createBottomTabNavigator();
 
@@ -36,7 +36,7 @@ function NavigationBar(props) {
             },
         })}>
             <Tab.Screen name="Friends" component={FriendsStackNavigator} />
-            <Tab.Screen name="Groups" component={GroupScreen} />
+            <Tab.Screen name="Groups" component={GroupStackNavigator} />
             <Tab.Screen name="Calculate" component={CalculateScreen} />
             <Tab.Screen name="Scan" component={ScanScreen} />
             <Tab.Screen name="Profile" component={ProfileScreen} />
