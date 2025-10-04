@@ -6,6 +6,7 @@ import { TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import SearchBarComponent from '../../../Components/SearchBarComponet';
+import { supabase } from '../../../lib/supabase';
 
 const GROUP_COLORS = [
     '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
@@ -33,16 +34,55 @@ function CreateGroupScreen(props) {
 
         setIsLoading(true);
         try {
-            // TODO: Implement group creation logic
-            console.log('Creating group:', {
-                name: groupName.trim(),
-                description: groupDescription.trim(),
-                color: selectedColor,
-                icon: selectedIcon
-            });
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+            if (userError || !user) {
+                throw new Error('Not authenticated');
+            }
 
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            const { data, error } = await supabase
+                .from('groups')
+                .insert([
+                    {
+                        name: groupName.trim(),
+                        description: groupDescription.trim(),
+                        color: selectedColor,
+                        icon: selectedIcon,
+                        created_by: user.id,
+                    }
+                ])
+                .select()
+                .single();
+            if (error) {
+                throw error;
+            }
+            const groupId = data.id;
+            if (addedUsers.length >= 0) {
+                const membersToAdd = [
+                    {
+                        group_id: groupId,
+                        member_id: user.id,
+                        role: 'admin',
+                        status: 'accepted',
+                        joined_at: new Date().toISOString(),
+                    },
+                    ...addedUsers.map(addedUser => ({
+                        group_id: groupId,
+                        member_id: addedUser.id,
+                        role: 'member',
+                        status: 'pending',
+                    }))
+                ];
+
+                console.log(membersToAdd);
+                const { error: membersError } = await supabase
+                    .from('group_members')
+                    .insert(membersToAdd);
+
+                if (membersError) {
+                    throw new Error('Failed to add some members to the group');
+                }
+            }
 
             Alert.alert('Success', 'Group created successfully!', [
                 {

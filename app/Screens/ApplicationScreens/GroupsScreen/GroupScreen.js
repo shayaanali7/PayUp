@@ -36,8 +36,6 @@ function GroupScreen(props) {
                         )
                     `)
                     .eq('member_id', user.id);
-                console.log('User Groups:', userGroups);
-               
             } catch (error) {
                 console.error('Error loading groups:', error);
             }
